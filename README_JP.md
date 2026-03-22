@@ -72,7 +72,7 @@ Media Pool / Power Bin で選択した Text+ クリップの\*\*スタイルを�
 
 ```
 
-TextPlusStyleCopier.py
+TextPlusStyleCopier_JP.py
 
 ```
 

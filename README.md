@@ -28,9 +28,6 @@ This tool is designed to speed up subtitle / title styling workflows.
 
 \* 📝 Keeps original text content (only style is copied)
 
-\* 🗑 Temporary reference clip is automatically removed
-
-\* 🎬 Restores timeline playhead position after execution
 
 
 

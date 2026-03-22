@@ -112,7 +112,7 @@ C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Fusion\\Scripts\\Edit
 
 ```
 
-Workspace → Scripts → ApplyTextPlusStyle
+Workspace → Scripts → TextPlusStyleCopier
 
 ```
 

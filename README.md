@@ -84,7 +84,7 @@ ApplyTextPlusStyle.py
 
 ```
 
-C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\Fusion\\Scripts\\Utility
+C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Fusion\\Scripts\\Edit
 
 ```
 

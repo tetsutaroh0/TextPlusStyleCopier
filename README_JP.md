@@ -116,7 +116,7 @@ C:\\\\ProgramData\\\\Blackmagic Design\\\\DaVinci Resolve\\\\Fusion\\\\Scripts\\
 
 ```
 
-Workspace → Scripts → TextPlusStyleCopier
+Workspace → Scripts → TextPlusStyleCopier_JP
 
 ```
 

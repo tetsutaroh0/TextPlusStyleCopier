@@ -68,7 +68,7 @@ This tool is designed to speed up subtitle / title styling workflows.
 
 ```
 
-ApplyTextPlusStyle.py
+TextPlusStyleCopier.py
 
 ```
 

@@ -1,297 +1,146 @@
-\# Text+ Style Copier for DaVinci Resolve
+# TextPlusStyleCopier for DaVinci Resolve
 
+A utility script for DaVinci Resolve that copies Text+ styles to multiple clips using clip color filtering.
 
+This tool is designed for fast subtitle and title workflow customization while keeping each clip’s original text and layout.
 
-A Python script for DaVinci Resolve that copies the \*\*Text+ style\*\* from a reference clip (selected in Media Pool / Power Bin) and applies it to multiple Text+ clips on the timeline based on \*\*clip color filtering\*\*.
+---
 
+# Features
 
+* Copy Text+ styles to multiple clips at once
+* Target clips by clip color
+* Optional track filtering
 
-This tool is designed to speed up subtitle / title styling workflows.
+  * Apply to all tracks
+  * Or only a specific video track (V1 / V2 / etc.)
+* Preserve individual properties:
 
+  * Text content
+  * Position
+  * Size
+  * Rotation
+  * Pivot
+* Persistent UI window
+* Works with Power Bin / Media Pool source clips
+* Keeps original playhead position
+* Automatically removes temporary reference clip
+* Supports repeated execution without reopening the script
 
+---
 
-\---
+# Requirements
 
+* DaVinci Resolve Studio / Free
+* Python environment installed
+* DaVinci Resolve scripting enabled
 
+Tested on:
 
-\## ✨ Features
+* Windows
+* DaVinci Resolve 21.x
 
+---
 
+# Installation
 
-\* 🎯 Apply Text+ style to multiple clips at once
+## 1. Install Python
 
-\* 🎨 Filter target clips by \*\*clip color\*\*
+Python 3.x is required.
 
-\* 🔁 Persistent UI (no need to relaunch every time)
+Download:
+https://www.python.org/downloads/
 
-\* 🧠 Remembers last used color and settings
+Make sure:
 
-\* 📝 Keeps original text content (only style is copied)
+* "Add Python to PATH" is enabled during installation
 
+---
 
+## 2. Install the Script
 
+Copy the script file into the DaVinci Resolve Scripts folder.
 
-\---
+Example (Windows):
 
+```text
 
-
-\## 🧰 Requirements
-
-
-
-\* DaVinci Resolve Studio (recommended)
-
-\* Python scripting enabled
-
-\* Fusion UIManager available
-
-
-
-> ⚠️ UI may not work in the free version depending on Resolve version.
-
-
-
-\---
-
-
-
-\## 🚀 Installation
-
-
-
-1\. Save the script as:
-
-
-
-```
-
-TextPlusStyleCopier.py
-
-```
-
-
-
-2\. Place it in your Resolve Scripts folder:
-
-
-
-\*\*Windows\*\*
-
-
+C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Fusion\\Scripts\\Utility
 
 ```
 
-C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Fusion\\Scripts\\Edit
+---
 
-```
+# Usage
 
+## Basic Workflow
 
+1. Put your reference Text+ clip into the Power Bin or Media Pool
+2. Select the reference Text+ clip
+3. Assign a clip color to target Text+ clips on the timeline
+4. Run the script
+5. Choose:
 
-\*\*Mac\*\*
+   * Target clip color
+   * Target track
+   * Preserve options
+6. Click Apply
 
+---
 
+# Preserve Options
 
-```
+You can preserve individual properties while applying styles:
 
-/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility
+| Option   | Description                 |
+| -------- | --------------------------- |
+| Text     | Keeps original text content |
+| Position | Keeps clip position         |
+| Size     | Keeps text size             |
+| Rotation | Keeps rotation              |
+| Pivot    | Keeps pivot settings        |
 
-```
+---
 
+# Track Filtering
 
+You can limit style application to a specific video track.
 
-3\. Restart DaVinci Resolve
+| Value | Target     |
+| ----- | ---------- |
+| 0     | All Tracks |
+| 1     | V1         |
+| 2     | V2         |
+| 3     | V3         |
 
+etc.
 
+---
 
-4\. Run from:
+# Notes
 
+* Only Text+ clips are supported
+* Fusion Titles other than Text+ may not work
+* The script temporarily appends the source clip to the timeline internally
+* Temporary clips are automatically removed afterward
 
+---
 
-```
+# Included Versions
 
-Workspace → Scripts → TextPlusStyleCopier
+| File                      | Description         |
+| ------------------------- | ------------------- |
+| TextPlusStyleCopier_JP.py | Japanese UI version |
+| TextPlusStyleCopier.py    | English UI version  |
 
-```
+---
 
+# License
 
+MIT License
 
-\---
+---
 
+# Author
 
-
-\## 🧑‍💻 How to Use
-
-
-
-\### Step 1 — Select Source Style
-
-
-
-Select a \*\*Text+ clip in Media Pool / Power Bin\*\*
-
-→ This will be the style reference
-
-
-
-\---
-
-
-
-\### Step 2 — Mark Target Clips
-
-
-
-On the timeline, assign a \*\*clip color\*\* (e.g. Orange)
-
-to all Text+ clips you want to update
-
-
-
-\---
-
-
-
-\### Step 3 — Run Script
-
-
-
-\* Choose the target clip color in UI
-
-\* Enable / disable:
-
-
-
-&#x20; \* \*\*Keep Clip Color After Apply\*\*
-
-\* Click \*\*Apply\*\*
-
-
-
-\---
-
-
-
-\### Step 4 — Repeat Freely
-
-
-
-The UI stays open, so you can:
-
-
-
-\* Change source clip
-
-\* Change target color
-
-\* Apply again instantly
-
-
-
-\---
-
-
-
-\## 🧠 How It Works
-
-
-
-1\. Selected Media Pool Text+ is temporarily added to timeline
-
-2\. Its Fusion TextPlus node settings are extracted
-
-3\. All timeline Text+ clips with selected color are processed
-
-4\. Style is applied while preserving original text (`StyledText`)
-
-5\. Temporary clip is deleted
-
-6\. Playhead position is restored
-
-
-
-\---
-
-
-
-\## ⚠️ Limitations
-
-
-
-\* Resolve scripting API does \*\*not reliably support multi-selection\*\*
-
-&#x20; → Clip color filtering is used instead
-
-
-
-\* Reference clip may appear very briefly in timeline
-
-&#x20; → This cannot be fully avoided due to API limitations
-
-
-
-\---
-
-
-
-\## 💡 Tips
-
-
-
-\* Use different colors for different styling groups
-
-\* Combine with Power Bin for reusable style templates
-
-\* Keep a "master style library" project for reuse
-
-
-
-\---
-
-
-
-\## 🛠 Possible Extensions
-
-
-
-\* Style preset buttons (Title / Subtitle / Highlight)
-
-\* Track-based filtering
-
-\* Selection-based processing (if API improves)
-
-\* Visual color picker UI
-
-
-
-\---
-
-
-
-\## 📄 License
-
-
-
-Free to use, modify, and distribute.
-
-
-
-\---
-
-
-
-\## 🙌 Credits
-
-
-
-Created with help from ChatGPT and real-world DaVinci Resolve workflow testing.
-
-
-
-\---
-
-
-
-Enjoy faster Text+ styling 🚀
-
-
-
+Tetsu

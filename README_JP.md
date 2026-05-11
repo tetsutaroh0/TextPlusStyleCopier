@@ -38,7 +38,7 @@
 動作確認:
 
 * Windows
-* DaVinci Resolve 19.x
+* DaVinci Resolve 21.x
 
 ---
 

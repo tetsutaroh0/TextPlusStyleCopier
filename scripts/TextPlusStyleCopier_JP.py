@@ -25,19 +25,29 @@ COLOR_LIST = [
 
 DEFAULT_COLOR = "Orange"
 
+DEFAULT_PRESERVE_OPTIONS = {
+    "text": True,
+    "center": True,
+    "size": True,
+    "angle": False,
+    "pivot": False,
+}
+
 
 def get_settings_file_path():
     try:
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "ApplyTextPlusStyle_settings.json")
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "TextPlusStyleCopier_settings.json")
     except Exception:
-        return "ApplyTextPlusStyle_settings.json"
+        return "TextPlusStyleCopier_settings.json"
 
 
 def load_ui_settings():
     settings_path = get_settings_file_path()
     default_settings = {
         "last_color": DEFAULT_COLOR,
-        "keep_color": True
+        "keep_color": True,
+        "target_track": 0,
+        "preserve_options": dict(DEFAULT_PRESERVE_OPTIONS),
     }
 
     if not os.path.exists(settings_path):
@@ -46,20 +56,52 @@ def load_ui_settings():
     try:
         with open(settings_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+
         if data.get("last_color") not in COLOR_LIST:
             data["last_color"] = DEFAULT_COLOR
+
         if "keep_color" not in data:
             data["keep_color"] = True
+
+        try:
+            data["target_track"] = int(data.get("target_track", 0))
+            if data["target_track"] < 0:
+                data["target_track"] = 0
+        except Exception:
+            data["target_track"] = 0
+
+        preserve_options = data.get("preserve_options", {})
+        merged = dict(DEFAULT_PRESERVE_OPTIONS)
+        for k in merged.keys():
+            if k in preserve_options:
+                merged[k] = bool(preserve_options[k])
+        data["preserve_options"] = merged
+
         return data
     except Exception:
         return default_settings
 
 
-def save_ui_settings(color, keep_color):
+def save_ui_settings(color, keep_color, preserve_options, target_track):
     settings_path = get_settings_file_path()
+
+    merged = dict(DEFAULT_PRESERVE_OPTIONS)
+    for k in merged.keys():
+        if k in preserve_options:
+            merged[k] = bool(preserve_options[k])
+
+    try:
+        target_track = int(target_track)
+        if target_track < 0:
+            target_track = 0
+    except Exception:
+        target_track = 0
+
     data = {
         "last_color": color if color in COLOR_LIST else DEFAULT_COLOR,
-        "keep_color": bool(keep_color)
+        "keep_color": bool(keep_color),
+        "target_track": target_track,
+        "preserve_options": merged,
     }
     try:
         with open(settings_path, "w", encoding="utf-8") as f:
@@ -140,6 +182,13 @@ def get_selected_mediapool_clip(media_pool):
     return None
 
 
+def get_timeline_video_items_in_track(timeline, track_index):
+    try:
+        return timeline.GetItemListInTrack("video", track_index) or []
+    except Exception:
+        return []
+
+
 def get_all_timeline_video_items(timeline):
     result = []
     try:
@@ -148,11 +197,7 @@ def get_all_timeline_video_items(timeline):
         return result
 
     for track_index in range(1, track_count + 1):
-        try:
-            items = timeline.GetItemListInTrack("video", track_index) or []
-        except Exception:
-            items = []
-        result.extend(items)
+        result.extend(get_timeline_video_items_in_track(timeline, track_index))
 
     return result
 
@@ -241,17 +286,56 @@ def clear_clip_color_safe(item):
     return False
 
 
-def copy_style_keep_text(src_tool, dst_comp, dst_tool):
+def get_input_safe(tool, name):
+    try:
+        return tool.GetInput(name)
+    except Exception:
+        return None
+
+
+def set_input_safe(tool, name, value):
+    try:
+        tool.SetInput(name, value)
+        return True
+    except Exception:
+        return False
+
+
+def build_preserve_map(dst_tool, preserve_options):
+    input_map = {
+        "text": "StyledText",
+        "center": "Center",
+        "size": "Size",
+        "angle": "Angle",
+        "pivot": "Pivot",
+    }
+
+    preserved = {}
+    for key, input_name in input_map.items():
+        if preserve_options.get(key):
+            preserved[input_name] = get_input_safe(dst_tool, input_name)
+
+    return preserved
+
+
+def restore_preserved_inputs(dst_tool, preserved):
+    ok = True
+    for input_name, value in preserved.items():
+        if value is not None:
+            if not set_input_safe(dst_tool, input_name, value):
+                print(f"{input_name} 復元中にエラー")
+                ok = False
+    return ok
+
+
+def copy_style_with_preserve_options(src_tool, dst_comp, dst_tool, preserve_options):
     try:
         src_settings = src_tool.SaveSettings()
     except Exception as e:
         print("SaveSettings に失敗:", e)
         return False
 
-    try:
-        dst_text_before = dst_tool.GetInput("StyledText")
-    except Exception:
-        dst_text_before = None
+    preserved = build_preserve_map(dst_tool, preserve_options)
 
     try:
         dst_comp.Lock()
@@ -266,12 +350,8 @@ def copy_style_keep_text(src_tool, dst_comp, dst_tool):
         print("LoadSettings 中にエラー:", e)
         ok = False
 
-    if dst_text_before is not None:
-        try:
-            dst_tool.SetInput("StyledText", dst_text_before)
-        except Exception as e:
-            print("StyledText 復元中にエラー:", e)
-            ok = False
+    if not restore_preserved_inputs(dst_tool, preserved):
+        ok = False
 
     try:
         dst_comp.Unlock()
@@ -304,23 +384,38 @@ def delete_timeline_item_safe(timeline, item):
     return False
 
 
-def find_colored_textplus_items(timeline, target_color, exclude_item=None):
+def find_colored_textplus_items(timeline, target_color, target_track=0, exclude_item=None):
     result = []
-    for item in get_all_timeline_video_items(timeline):
-        if exclude_item and item == exclude_item:
-            continue
 
-        color = get_clip_color_safe(item)
-        if color != target_color:
-            continue
+    try:
+        track_count = timeline.GetTrackCount("video")
+    except Exception:
+        track_count = 0
 
-        if is_textplus_timeline_item(item):
-            result.append(item)
+    if track_count <= 0:
+        return result
+
+    if target_track and target_track > 0:
+        track_indices = [target_track]
+    else:
+        track_indices = list(range(1, track_count + 1))
+
+    for track_index in track_indices:
+        for item in get_timeline_video_items_in_track(timeline, track_index):
+            if exclude_item and item == exclude_item:
+                continue
+
+            color = get_clip_color_safe(item)
+            if color != target_color:
+                continue
+
+            if is_textplus_timeline_item(item):
+                result.append(item)
 
     return result
 
 
-def run_apply(resolve, target_color, keep_color):
+def run_apply(resolve, target_color, keep_color, preserve_options, target_track):
     result = {
         "ok": False,
         "message": "",
@@ -360,9 +455,17 @@ def run_apply(resolve, target_color, keep_color):
             result["message"] = "参照元クリップ内に TextPlus ツールが見つかりません。"
             return result
 
-        target_items = find_colored_textplus_items(timeline, target_color, exclude_item=ref_timeline_item)
+        target_items = find_colored_textplus_items(
+            timeline,
+            target_color,
+            target_track=target_track,
+            exclude_item=ref_timeline_item
+        )
         if not target_items:
-            result["message"] = f"{target_color} の Text+ クリップが見つかりません。"
+            if target_track > 0:
+                result["message"] = f"V{target_track} 上に {target_color} の Text+ クリップが見つかりません。"
+            else:
+                result["message"] = f"{target_color} の Text+ クリップが見つかりません。"
             return result
 
         copied_count = 0
@@ -374,7 +477,7 @@ def run_apply(resolve, target_color, keep_color):
                 failed_count += 1
                 continue
 
-            ok = copy_style_keep_text(src_tool, dst_comp, dst_tool)
+            ok = copy_style_with_preserve_options(src_tool, dst_comp, dst_tool, preserve_options)
             if ok:
                 copied_count += 1
                 if not keep_color:
@@ -385,7 +488,10 @@ def run_apply(resolve, target_color, keep_color):
         result["ok"] = True
         result["copied_count"] = copied_count
         result["failed_count"] = failed_count
-        result["message"] = f"完了: 成功 {copied_count} / 失敗 {failed_count}"
+        if target_track > 0:
+            result["message"] = f"完了: V{target_track} 成功 {copied_count} / 失敗 {failed_count}"
+        else:
+            result["message"] = f"完了: 成功 {copied_count} / 失敗 {failed_count}"
         return result
 
     finally:
@@ -401,6 +507,8 @@ def show_persistent_ui(resolve):
     saved_settings = load_ui_settings()
     default_color = saved_settings.get("last_color", DEFAULT_COLOR)
     default_keep_color = bool(saved_settings.get("keep_color", True))
+    default_target_track = int(saved_settings.get("target_track", 0))
+    default_preserve = saved_settings.get("preserve_options", dict(DEFAULT_PRESERVE_OPTIONS))
 
     try:
         fusion = resolve.Fusion()
@@ -413,8 +521,8 @@ def show_persistent_ui(resolve):
     window = dispatcher.AddWindow(
         {
             "ID": "TextPlusStyleWin",
-            "WindowTitle": "Apply Text+ Style",
-            "Geometry": [100, 100, 560, 270],
+            "WindowTitle": "TextPlusStyleCopier",
+            "Geometry": [100, 100, 700, 520],
         },
         ui.VGroup(
             [
@@ -428,7 +536,19 @@ def show_persistent_ui(resolve):
                     "MinimumSize": [500, 34],
                     "MaximumSize": [16777215, 34],
                 }),
-                ui.VGap(4),
+                ui.VGap(6),
+                ui.Label({
+                    "ID": "trackLabel",
+                    "Text": "対象トラック番号（0=全トラック、1=V1、2=V2 ...）",
+                    "Alignment": {"AlignLeft": True, "AlignVCenter": True},
+                }),
+                ui.LineEdit({
+                    "ID": "trackEdit",
+                    "Text": str(default_target_track),
+                    "MinimumSize": [160, 30],
+                    "MaximumSize": [240, 30],
+                }),
+                ui.VGap(6),
                 ui.CheckBox({
                     "ID": "keepColorCheck",
                     "Text": "処理後もクリップカラーを残す",
@@ -436,11 +556,46 @@ def show_persistent_ui(resolve):
                 }),
                 ui.VGap(8),
                 ui.Label({
+                    "ID": "preserveLabel",
+                    "Text": "保持する項目",
+                    "Alignment": {"AlignLeft": True, "AlignVCenter": True},
+                }),
+                ui.HGroup([
+                    ui.CheckBox({
+                        "ID": "preserveTextCheck",
+                        "Text": "本文",
+                        "Checked": bool(default_preserve.get("text", True)),
+                    }),
+                    ui.CheckBox({
+                        "ID": "preserveCenterCheck",
+                        "Text": "位置",
+                        "Checked": bool(default_preserve.get("center", True)),
+                    }),
+                    ui.CheckBox({
+                        "ID": "preserveSizeCheck",
+                        "Text": "サイズ",
+                        "Checked": bool(default_preserve.get("size", True)),
+                    }),
+                ]),
+                ui.HGroup([
+                    ui.CheckBox({
+                        "ID": "preserveAngleCheck",
+                        "Text": "回転",
+                        "Checked": bool(default_preserve.get("angle", False)),
+                    }),
+                    ui.CheckBox({
+                        "ID": "preservePivotCheck",
+                        "Text": "ピボット",
+                        "Checked": bool(default_preserve.get("pivot", False)),
+                    }),
+                ]),
+                ui.VGap(8),
+                ui.Label({
                     "ID": "statusLabel",
                     "Text": "参照元 Text+ を Power Bin / Media Pool で選択してから実行してください。",
                     "WordWrap": True,
                     "Alignment": {"AlignLeft": True, "AlignTop": True},
-                    "MinimumSize": [500, 40],
+                    "MinimumSize": [500, 48],
                 }),
                 ui.VGap(8),
                 ui.HGroup(
@@ -448,13 +603,17 @@ def show_persistent_ui(resolve):
                         ui.Button({
                             "ID": "runBtn",
                             "Text": "実行",
-                            "MinimumSize": [160, 36],
+                            "MinimumSize": [140, 36],
+                            "MaximumSize": [220, 36],
+                            "Weight": 1,
                             "Default": True
                         }),
                         ui.Button({
                             "ID": "closeBtn",
                             "Text": "閉じる",
-                            "MinimumSize": [160, 36]
+                            "MinimumSize": [140, 36],
+                            "MaximumSize": [220, 36],
+                            "Weight": 1
                         }),
                     ]
                 ),
@@ -490,7 +649,22 @@ def show_persistent_ui(resolve):
         except Exception:
             keep_color = True
 
-        return color, keep_color
+        preserve_options = {
+            "text": bool(items["preserveTextCheck"].Checked),
+            "center": bool(items["preserveCenterCheck"].Checked),
+            "size": bool(items["preserveSizeCheck"].Checked),
+            "angle": bool(items["preserveAngleCheck"].Checked),
+            "pivot": bool(items["preservePivotCheck"].Checked),
+        }
+
+        try:
+            target_track = int(items["trackEdit"].Text)
+            if target_track < 0:
+                target_track = 0
+        except Exception:
+            target_track = 0
+
+        return color, keep_color, preserve_options, target_track
 
     def set_status(text):
         try:
@@ -499,14 +673,14 @@ def show_persistent_ui(resolve):
             print(text)
 
     def on_run(ev):
-        color, keep_color = read_ui_values()
-        save_ui_settings(color, keep_color)
+        color, keep_color, preserve_options, target_track = read_ui_values()
+        save_ui_settings(color, keep_color, preserve_options, target_track)
         set_status("処理中...")
 
         try:
-            result = run_apply(resolve, color, keep_color)
+            result = run_apply(resolve, color, keep_color, preserve_options, target_track)
             set_status(result["message"])
-        except Exception as e:
+        except Exception:
             print(traceback.format_exc())
             set_status("エラーが発生しました。コンソールを確認してください。")
 
@@ -523,7 +697,7 @@ def show_persistent_ui(resolve):
 
 
 def main():
-    print("=== Apply Text+ Style with Persistent UI ===")
+    print("=== TextPlusStyleCopier ===")
 
     resolve = dvr.scriptapp("Resolve")
     if not resolve:

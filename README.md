@@ -76,7 +76,7 @@ C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Fusion\\Scripts\\Utility
 ## Basic Workflow
 
 1. Put your reference Text+ clip into the Power Bin or Media Pool
-2. Select the reference Text+ clip
+2. Select the reference Text+ clip in the Power Bin or Media Pool
 3. Assign a clip color to target Text+ clips on the timeline
 4. Run the script
 5. Choose:
